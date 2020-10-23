@@ -34,10 +34,15 @@ class CharucoPose:
         # Estimate large single marker pose
         if corner is not []:
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corner, self.marker_size , self.mtx, self.distCoef)
+            
+            if tvecs is None:
+                rvecs = np.nan * np.ones((1, 1, 3))
+                tvecs = np.nan * np.ones((1, 1, 3))
             return rvecs, tvecs
         
-        #rvecs = np.nan*np.ones(x.shape)
-        return np.nan, np.nan
+        rvecs = np.nan * np.ones((1, 1, 3))
+        tvecs = np.nan * np.ones((1, 1, 3))
+        return rvecs, tvecs
     
     def filter_ids(self, ids, corners):
         if ids is not None:
