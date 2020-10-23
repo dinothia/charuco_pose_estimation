@@ -1,7 +1,7 @@
 import cv2
 
 
-class aruco_detector:
+class ArucoDetector:
     def __init__(self):
         self.dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_1000)
 

@@ -31,14 +31,15 @@ from sensor_msgs.msg import CompressedImage
 # from cv_bridge import CvBridge, CvBridgeError
 
 # Marker libraries
-from aruco_detection import aruco_detector
+from aruco_detection import ArucoDetector
+from charuco_pose import CharucoPose
 
 VERBOSE=False
 SHOW_IMAGE=True
 
 class image_subscriber:
 
-    def __init__(self, camera_topic, detector):
+    def __init__(self, camera_topic, marker_detector, pose_estimator):
         '''Initialize ros subscriber'''
         # subscribed Topic
         self.subscriber = rospy.Subscriber(camera_topic,
@@ -46,8 +47,9 @@ class image_subscriber:
         if VERBOSE :
             print(f"subscribed to {camera_topic}")
 
-        # detector
-        self.detector = detector
+        # marker detector and pose estimator
+        self.marker_detector = marker_detector
+        self.pose_estimator = pose_estimator
 
         self.current_time = 0
         self.previous_time = 0
@@ -58,18 +60,26 @@ class image_subscriber:
         if VERBOSE :
             print('received image of type: "%s"' % ros_data.format)
 
-        #### direct conversion to CV2 ####
+        ## Direct conversion to CV2 ####
         np_arr = np.frombuffer(ros_data.data, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) 
-        corners, ids = self.detector.get_corner_and_ids(frame)
-                
+
+        ## Detect, filter markers and estimate pose
+        corners, ids = self.marker_detector.get_corner_and_ids(frame)
+        _, filt_corner = self.pose_estimator.filter_ids(ids, corners)
+        rvec, tvec = self.pose_estimator.estimate_pose(filt_corner)
+        
+        if VERBOSE and tvec is not None:
+            print(tvec[0][0][-1])
+
         if SHOW_IMAGE:
-            marker_frame = self.detector.draw_markers(frame, corners, ids)
+            marker_frame = self.marker_detector.draw_markers(frame, corners, ids)
 
             cv2.imshow('cv_img', marker_frame)
             cv2.waitKey(2)
 
-        print(f"Hz: {self.get_frequency()}")
+        if VERBOSE:
+            print(f"Hz: {self.get_frequency()}")
 
     def get_frequency(self):
         self.current_time = rospy.get_time()
@@ -79,16 +89,26 @@ class image_subscriber:
         return frequency
 
 def main(args):
+    # Get commandline arguments
     camera_topic = args[1]
-    detector = aruco_detector()
+    camera_path_path = args[2]
+
+    marker_detector = ArucoDetector()
+
+    # Pose estimator large marker
+    x, y = 3, 3
+    square_size = 0.300  # m
+    marker_size = 0.225  # m 
+    marker_id = 0
+    pose_estimator = CharucoPose(camera_path_path, x, y, square_size, marker_size, marker_id)
 
     '''Initializes and cleanup ros node'''
-    ic = image_subscriber(camera_topic, detector)
+    ic = image_subscriber(camera_topic, marker_detector, pose_estimator)
     rospy.init_node('image_subscriber', anonymous=True)
     try:
         rospy.spin()
     except KeyboardInterrupt:
-        print("Shutting down ROS Image feature detector module")
+        print("Shutting down ROS Image feature marker_detector module")
     cv2.destroyAllWindows()
 
 
