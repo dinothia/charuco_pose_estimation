@@ -50,19 +50,3 @@ class CharucoPose:
                 if id == self.filter_id:
                     return np.array([id]), [corners[i]]
         return None, []
-
-def rodrigues_to_euler_angles(rvec):
-        # Reference: https://www.programcreek.com/python/example/89450/cv2.Rodrigues
-        mat, jac = cv2.Rodrigues(rvec)
-        sy = np.sqrt(mat[0, 0] * mat[0, 0] + mat[1, 0] * mat[1, 0])
-        singular = sy < 1e-6
-        if not singular:
-            x = np.math.atan2(mat[2, 1], mat[2, 2])
-            y = np.math.atan2(-mat[2, 0], sy)
-            z = np.math.atan2(mat[1, 0], mat[0, 0])
-        else:
-            x = np.math.atan2(-mat[1, 2], mat[1, 1])
-            y = np.math.atan2(-mat[2, 0], sy)
-            z = 0
-        return np.array([x, y, z]) 
-

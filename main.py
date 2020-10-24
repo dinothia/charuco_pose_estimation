@@ -39,7 +39,7 @@ SHOW_IMAGE=True
 
 class image_subscriber:
 
-    def __init__(self, camera_topic, marker_detector, pose_estimator):
+    def __init__(self, camera_topic, marker_detector, pose_estimator, outfile_path):
         '''Initialize ros subscriber'''
         # subscribed Topic
         self.subscriber = rospy.Subscriber(camera_topic,
@@ -53,6 +53,12 @@ class image_subscriber:
 
         self.current_time = 0
         self.previous_time = 0
+        
+        self.outfile_path = outfile_path
+
+        self.timestamps, self.tvecs, self.rvecs = [], [], []
+        self.current_timestamp = 0
+        self.dt = 0.1
 
     def callback(self, ros_data):
         '''Callback function of subscribed topic. 
@@ -68,30 +74,41 @@ class image_subscriber:
         corners, ids = self.marker_detector.get_corner_and_ids(frame)
         _, filt_corner = self.pose_estimator.filter_ids(ids, corners)
         rvec, tvec = self.pose_estimator.estimate_pose(filt_corner)
-        
-        if VERBOSE and tvec is not None:
-            print(tvec[0][0][-1])
+
+        ## Append pose to list
+        self.timestamps.append(self.current_timestamp)
+        self.tvecs.append(tvec)
+        self.rvecs.append(rvec)
 
         if SHOW_IMAGE:
             marker_frame = self.marker_detector.draw_markers(frame, corners, ids)
-
             cv2.imshow('cv_img', marker_frame)
             cv2.waitKey(2)
 
         if VERBOSE:
             print(f"Hz: {self.get_frequency()}")
 
+        self.current_timestamp += self.dt
+
     def get_frequency(self):
         self.current_time = rospy.get_time()
         frequency = 1.0 / (self.current_time - self.previous_time)
-        self.previous_time = self.current_time
+        self.previous_time = self.current_time\
+                    
         
         return frequency
+
+    def save_to_file(self):
+        with open(self.outfile_path, "w") as file:
+            for t, tvec, rvec in zip(self.timestamps, self.tvecs, self.rvecs):
+                file.write(f"{round(t, 2)}, {tvec[0][0][0]}, {tvec[0][0][1]}, {tvec[0][0][2]}, {rvec[0][0][0]}, {rvec[0][0][1]}, {rvec[0][0][2]}\n")
+
 
 def main(args):
     # Get commandline arguments
     camera_topic = args[1]
     camera_path_path = args[2]
+    outfile_path = args[3]
 
     marker_detector = ArucoDetector()
 
@@ -103,13 +120,15 @@ def main(args):
     pose_estimator = CharucoPose(camera_path_path, x, y, square_size, marker_size, marker_id)
 
     '''Initializes and cleanup ros node'''
-    ic = image_subscriber(camera_topic, marker_detector, pose_estimator)
+    ic = image_subscriber(camera_topic, marker_detector, pose_estimator, outfile_path)
     rospy.init_node('image_subscriber', anonymous=True)
     try:
         rospy.spin()
     except KeyboardInterrupt:
         print("Shutting down ROS Image feature marker_detector module")
     cv2.destroyAllWindows()
+
+    ic.save_to_file()
 
 
 if __name__ == '__main__':
