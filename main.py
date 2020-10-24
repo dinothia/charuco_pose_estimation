@@ -33,7 +33,13 @@ from sensor_msgs.msg import CompressedImage
 # Marker libraries
 from aruco_detection import ArucoDetector
 from charuco_pose import CharucoPose
-from plot_pose import save_pose
+from plot_pose import (
+    save_pose, 
+    read_pose,
+    plot_orientation, 
+    plot_translation, 
+    show_all
+)
 
 VERBOSE=False
 SHOW_IMAGE=True
@@ -129,6 +135,15 @@ def main(args):
 
     # Save pose to file when ctrl+C/exit
     ic.save_to_file()
+
+    # Read pose
+    t, tvecs, eulers = read_pose(outfile_path)
+    eulers_deg = 180 * eulers / np.pi
+
+    # Plot pose
+    plot_translation(t, tvecs)
+    plot_orientation(t, eulers_deg)
+    show_all()
 
 
 if __name__ == '__main__':

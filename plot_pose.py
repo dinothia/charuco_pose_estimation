@@ -100,6 +100,10 @@ def plot_orientation(t, eulers):
     plt.title("Camera translation")
     plt.tight_layout()
 
+def show_all():
+    plt.show()
+
+
 if __name__ == "__main__":
     filepath = "cameraTrajectory.txt"
     t, tvecs, eulers = read_pose(filepath)
