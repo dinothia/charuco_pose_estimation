@@ -108,6 +108,7 @@ class image_subscriber:
 
     def save_to_file(self):
         save_pose(self.outfile_path, self.timestamps, self.tvecs, self.rvecs)
+        print(f"Saving keyframe trajectory to {self.outfile_path} ...")
 
 def main(args):
     # Get commandline arguments
