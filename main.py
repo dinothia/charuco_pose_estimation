@@ -33,6 +33,7 @@ from sensor_msgs.msg import CompressedImage
 # Marker libraries
 from aruco_detection import ArucoDetector
 from charuco_pose import CharucoPose
+from plot_pose import save_pose
 
 VERBOSE=False
 SHOW_IMAGE=True
@@ -51,14 +52,17 @@ class image_subscriber:
         self.marker_detector = marker_detector
         self.pose_estimator = pose_estimator
 
-        self.current_time = 0
-        self.previous_time = 0
-        
+        # outfile path for pose
         self.outfile_path = outfile_path
 
+        # pose timestamps
+        self.current_time = 0
+        self.previous_time = 0
+
+        # initialize pose lists
         self.timestamps, self.tvecs, self.rvecs = [], [], []
-        self.current_timestamp = 0
-        self.dt = 0.1
+        self.camera_timestamp = 0
+        self.camera_dt = 0.1  # sampling time for camera 10 Hz
 
     def callback(self, ros_data):
         '''Callback function of subscribed topic. 
@@ -76,33 +80,28 @@ class image_subscriber:
         rvec, tvec = self.pose_estimator.estimate_pose(filt_corner)
 
         ## Append pose to list
-        self.timestamps.append(self.current_timestamp)
+        self.timestamps.append(self.camera_timestamp)
         self.tvecs.append(tvec)
         self.rvecs.append(rvec)
 
         if SHOW_IMAGE:
             marker_frame = self.marker_detector.draw_markers(frame, corners, ids)
+            frame = self.pose_estimator.draw_marker_axis(frame, rvec, tvec, 0.2)
+            
             cv2.imshow('cv_img', marker_frame)
             cv2.waitKey(2)
 
-        if VERBOSE:
-            print(f"Hz: {self.get_frequency()}")
-
-        self.current_timestamp += self.dt
+        print(f"t: {round(self.camera_timestamp, 2)} Hz: {self.get_frequency()}")
+        self.camera_timestamp += self.camera_dt
 
     def get_frequency(self):
         self.current_time = rospy.get_time()
         frequency = 1.0 / (self.current_time - self.previous_time)
-        self.previous_time = self.current_time\
-                    
-        
+        self.previous_time = self.current_time
         return frequency
 
     def save_to_file(self):
-        with open(self.outfile_path, "w") as file:
-            for t, tvec, rvec in zip(self.timestamps, self.tvecs, self.rvecs):
-                file.write(f"{round(t, 2)}, {tvec[0][0][0]}, {tvec[0][0][1]}, {tvec[0][0][2]}, {rvec[0][0][0]}, {rvec[0][0][1]}, {rvec[0][0][2]}\n")
-
+        save_pose(self.outfile_path, self.timestamps, self.tvecs, self.rvecs)
 
 def main(args):
     # Get commandline arguments
@@ -119,7 +118,7 @@ def main(args):
     marker_id = 0
     pose_estimator = CharucoPose(camera_path_path, x, y, square_size, marker_size, marker_id)
 
-    '''Initializes and cleanup ros node'''
+    # Initializes and cleanup ros node
     ic = image_subscriber(camera_topic, marker_detector, pose_estimator, outfile_path)
     rospy.init_node('image_subscriber', anonymous=True)
     try:
@@ -128,6 +127,7 @@ def main(args):
         print("Shutting down ROS Image feature marker_detector module")
     cv2.destroyAllWindows()
 
+    # Save pose to file when ctrl+C/exit
     ic.save_to_file()
 
 

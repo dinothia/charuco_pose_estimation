@@ -24,4 +24,4 @@ class ArucoDetector:
         return self.corners, self.ids
 
     def draw_markers(self, frame, corners, ids):
-        return cv2.aruco.drawDetectedMarkers(frame, corners, ids)#, borderColor=(100, 0, 240))
+        return cv2.aruco.drawDetectedMarkers(frame, corners, ids, borderColor=(255, 0, 0))

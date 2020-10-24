@@ -50,3 +50,8 @@ class CharucoPose:
                 if id == self.filter_id:
                     return np.array([id]), [corners[i]]
         return None, []
+
+   
+
+    def draw_marker_axis(self, frame, rvec, tvec, length_of_axis):
+        return cv2.aruco.drawAxis(frame, self.mtx, self.distCoef, rvec, tvec, length_of_axis)
