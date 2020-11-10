@@ -86,7 +86,7 @@ class image_subscriber:
         rvec, tvec = self.pose_estimator.estimate_pose(filt_corner)
 
         ## Append pose to list
-        self.timestamps.append(self.camera_timestamp)
+        self.timestamps.append(rospy.get_time())
         self.tvecs.append(tvec)
         self.rvecs.append(rvec)
 
