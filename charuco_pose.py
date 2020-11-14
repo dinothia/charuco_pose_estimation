@@ -4,14 +4,16 @@ import cv2
 
 
 class CharucoPose:
-    def __init__(self, camera_param_path, x, y, square_size, marker_size, marker_id):
+    def __init__(self, camera_param_path, x, y, square_size, marker_size, marker_ids, is_board):
         self.mtx, self.distCoef = self.load_camera_instrinsics(camera_param_path)
         self.marker_size = marker_size
+        self.filter_ids = marker_ids
         
-        aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_1000)
-        self.board = cv2.aruco.CharucoBoard_create(x, y, square_size, marker_size, aruco_dict)    
-        self.filter_id = marker_id
-
+        self.is_board = is_board
+        if is_board:
+            aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_1000)
+            self.board = cv2.aruco.CharucoBoard_create(x, y, square_size, marker_size, aruco_dict) 
+               
     def load_camera_instrinsics(self, yaml_path): 
         with open(yaml_path, "r") as file:
             c_p = yaml.load(file, Loader=yaml.FullLoader)
@@ -38,18 +40,44 @@ class CharucoPose:
             if tvecs is None:
                 rvecs = np.nan * np.ones((1, 1, 3))
                 tvecs = np.nan * np.ones((1, 1, 3))
-            return rvecs, tvecs
+                return rvecs, tvecs
         
-        rvecs = np.nan * np.ones((1, 1, 3))
-        tvecs = np.nan * np.ones((1, 1, 3))
+        rvecs = rvecs.reshape(1, 1, 3)
+        tvecs = tvecs.reshape(1, 1, 3)
         return rvecs, tvecs
     
-    def filter_ids(self, ids, corners):
+    def estimate_pose_board(self, ids, corners):
+        # Estimate large single marker pose
+        if corners is not []:
+            rvecs_, tvecs_, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_size , self.mtx, self.distCoef)
+            retval, rvecs, tvecs = cv2.aruco.estimatePoseBoard(corners, ids, self.board, self.mtx, self.distCoef, rvecs_, tvecs_)
+            
+            if tvecs is None:
+                rvecs = np.nan * np.ones((1, 1, 3))
+                tvecs = np.nan * np.ones((1, 1, 3))
+                return rvecs, tvecs
+        
+        rvecs = rvecs.reshape(1, 1, 3)
+        tvecs = tvecs.reshape(1, 1, 3)
+        return rvecs, tvecs
+
+    def filter_marker_ids(self, corners, ids):
+        out_corners = []
+        out_ids = []
         if ids is not None:
             for i, id in enumerate(ids):
-                if id == self.filter_id:
-                    return np.array([id]), [corners[i]]
-        return None, []
+                for filter_id in self.filter_ids:
+                    if id[0] == filter_id:
+                        out_corners.append(corners[i])
+                        out_ids.append(id)
+                        # add 0 id marker only once
+                        if filter_id == 0:  
+                            return out_corners, np.array(out_ids)
+
+
+        if len(out_ids) == 0:
+            return out_corners, None                        
+        return out_corners, np.array(out_ids)
 
    
 

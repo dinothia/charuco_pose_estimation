@@ -43,6 +43,7 @@ from plot_pose import (
 
 VERBOSE=False
 SHOW_IMAGE=True
+IS_BOARD=True
 
 class image_subscriber:
 
@@ -82,19 +83,23 @@ class image_subscriber:
 
         ## Detect, filter markers and estimate pose
         corners, ids = self.marker_detector.get_corner_and_ids(frame)
-        _, filt_corner = self.pose_estimator.filter_ids(ids, corners)
-        rvec, tvec = self.pose_estimator.estimate_pose(filt_corner)
+        filt_corner, filt_ids = self.pose_estimator.filter_marker_ids(corners, ids)
+        if self.pose_estimator.is_board:
+            rvec, tvec = self.pose_estimator.estimate_pose_board(filt_ids, filt_corner)
+        else:
+            rvec, tvec = self.pose_estimator.estimate_pose(filt_corner)
 
         ## Append pose to list
-        self.timestamps.append(rospy.get_time())
+        self.timestamps.append(self.camera_timestamp)#rospy.get_time())
         self.tvecs.append(tvec)
         self.rvecs.append(rvec)
 
         if SHOW_IMAGE:
             marker_frame = self.marker_detector.draw_markers(frame, corners, ids)
-            frame = self.pose_estimator.draw_marker_axis(frame, rvec, tvec, 0.2)
+            frame = self.pose_estimator.draw_marker_axis(frame, rvec, tvec, 0.4)
             
-            cv2.imshow('cv_img', marker_frame)
+            marker_frame_rs = cv2.resize(marker_frame, (1280, 800))      
+            cv2.imshow('cv_img', marker_frame_rs)
             cv2.waitKey(2)
 
         print(f"t: {round(self.camera_timestamp, 2)} Hz: {self.get_frequency()}")
@@ -119,11 +124,18 @@ def main(args):
     marker_detector = ArucoDetector()
 
     # Pose estimator large marker
-    x, y = 3, 3
-    square_size = 0.300  # m
-    marker_size = 0.225  # m 
-    marker_id = 0
-    pose_estimator = CharucoPose(camera_path_path, x, y, square_size, marker_size, marker_id)
+    if IS_BOARD:
+        x, y = 3, 3
+        square_size = 0.300  # m
+        marker_size = 0.225  # m 
+        marker_ids = [1, 2, 3]  # should be list
+    else:
+        x, y = None, None
+        square_size = None
+        marker_size = 0.900  # m
+        marker_ids = [0]  # should be list
+
+    pose_estimator = CharucoPose(camera_path_path, x, y, square_size, marker_size, marker_ids, IS_BOARD)
 
     # Initializes and cleanup ros node
     ic = image_subscriber(camera_topic, marker_detector, pose_estimator, outfile_path)
